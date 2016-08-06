@@ -87,3 +87,10 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+# Specific to this project
+*.swp
+_venv
+mysql/_test
+mysql/_data
+
