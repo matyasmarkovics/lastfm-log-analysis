@@ -1,5 +1,7 @@
+MYSQLD := $(shell which mysqld_safe &> /dev/null && echo mysqld_safe || echo mysqld)
 MYSQL_CMD_PATH := $(shell which mysql)
 MYSQL_BASEDIR := $(dir $(realpath $(MYSQL_CMD_PATH)))../
+MYSQL_SOCKET := ./_data/mysql.sock
 
 stop:
 	pkill mysqld || true 
@@ -13,17 +15,18 @@ init: clean
 		--datadir=./_data
 
 start: init
-	mysqld_safe \
+	$(MYSQLD) \
+		--socket=$(notdir $(MYSQL_SOCKET)) \
 		--timezone=UTC \
 		--basedir=$(MYSQL_BASEDIR) \
 		--datadir=./_data &
 	sleep 1
 
 create: start
-	mysql -u root < lastfm_schema.sql
+	mysql --socket=$(MYSQL_SOCKET) -u root < lastfm_schema.sql
 
 console:
-	mysql -u root
+	mysql --socket=$(MYSQL_SOCKET) -u root
 
 _test:
 	mkdir _test
@@ -38,9 +41,9 @@ $(MYTAP): _test
 	cd _test; git clone git@github.com:matyasmarkovics/mytap.git
 
 mytap: $(MYTAP)
-	cd $(dir $<); mysql -u root < $@.sql
+	cd $(dir $<); mysql --socket=../../$(MYSQL_SOCKET) -u root < $@.sql
 
 test: create retest
 
 retest: _test_data mytap
-	mysql -u root < lastfm_schema.tap.sql
+	mysql --socket=$(MYSQL_SOCKET) -u root < lastfm_schema.tap.sql

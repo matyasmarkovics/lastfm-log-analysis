@@ -16,7 +16,7 @@ run: _venv deps db-test
 	sleep 1
 
 stop: db-stop
-	pkill -f gunicorn
+	pkill -f gunicorn || true
 
 .PHONY: test
 test: db-_test_data

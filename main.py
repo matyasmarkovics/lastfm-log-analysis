@@ -8,7 +8,8 @@ import os
 
 @contextmanager
 def mysql_connector():
-    connection = pymysql.connect(unix_socket='/private/tmp/mysql.sock',
+    socket_path = os.path.dirname(os.path.realpath(__file__)) + '/mysql/_data/mysql.sock'
+    connection = pymysql.connect(unix_socket=socket_path,
                                  user='root',
                                  #password='passwd',
                                  host='localhost',
