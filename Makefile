@@ -21,8 +21,11 @@ stop: db-stop
 .PHONY: test
 test: db-_test_data
 	curl -F "tsv=@mysql/_test/30b9cdb95aecb5981749/testdata.tsv" \
-			localhost:8000/things; \
-	curl localhost:8000/things;
+			localhost:8000/log/memory; \
+	curl localhost:8000/users;
+	curl localhost:8000/play/top/10/users;
+	curl localhost:8000/play/top/10/songs;
+	curl localhost:8000/play/top/10/sessions;
 
 .PHONY: help
 help:

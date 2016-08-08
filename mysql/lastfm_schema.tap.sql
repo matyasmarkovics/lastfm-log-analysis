@@ -16,6 +16,9 @@ FROM lastfm.user;
 SELECT tap.eq( COUNT(*), 8, 'songs saved' )
 FROM lastfm.song;
 
+SELECT tap.eq( COUNT(*), 6, 'sessions identified' )
+FROM lastfm.session;
+
 SELECT tap.eq( COUNT(*), 10, 'All `log` entries saved to `play`' )
 FROM lastfm.play;
 
