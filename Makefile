@@ -15,6 +15,7 @@ start: _venv deps db-test
 	source $</bin/activate; gunicorn --reload main:app &
 	sleep 1
 
+.PHONY: stop
 stop: db-stop
 	pkill -f gunicorn || true
 
