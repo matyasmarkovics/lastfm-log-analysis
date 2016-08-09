@@ -1,49 +1,93 @@
-MYSQLD := $(shell which mysqld_safe &> /dev/null && echo mysqld_safe || echo mysqld)
-MYSQL_CMD_PATH := $(shell which mysql)
-MYSQL_BASEDIR := $(dir $(realpath $(MYSQL_CMD_PATH)))../
-MYSQL_SOCKET := ./_data/mysql.sock
+.DEFAULT_GOAL := help
+# Setup MySQL Flags
+MYSQL_DATADIR := ./_data
+MYSQL_SOCKET := $(MYSQL_DATADIR)/mysql.sock
+
+# To be able to work on Mac, need to find mysql installation dir
+MYSQL_CMD_PATH := $(realpath $(shell which mysql))
+MYSQL_BASEDIR := $(realpath $(dir $(MYSQL_CMD_PATH))../)
+
+# No need to specify basedir if MySQL is installed on default location
+ifneq ($(MYSQL_BASEDIR),/usr)
+MYSQL_BASEDIR_FLAG := --basedir=$(MYSQL_BASEDIR)
+endif
+
+# Rules that can be easily from outside
+.PHONY: clean init start stop console test_data help
+clean: stop
+	rm -rf $(MYSQL_DATADIR)
+
+init: $(MYSQL_DATADIR)/mysql
+
+start: $(MYSQL_SOCKET) 
 
 stop:
 	pkill mysqld || true 
 
-clean: stop
-	rm -rf _data
-
-init: clean
-	mysql_install_db \
-		--basedir=$(MYSQL_BASEDIR) \
-		--datadir=./_data
-
-start: init
-	$(MYSQLD) \
-		--socket=$(notdir $(MYSQL_SOCKET)) \
-		--timezone=UTC \
-		--basedir=$(MYSQL_BASEDIR) \
-		--datadir=./_data &
-	sleep 1
-
-create: start
-	mysql --socket=$(MYSQL_SOCKET) -u root < lastfm_schema.sql
-
-console:
+console: $(MYSQL_SOCKET)
 	mysql --socket=$(MYSQL_SOCKET) -u root
 
+test_data: $(TEST_DATA_TSV)
+
+help:
+	tail -n13 $(lastword $(MAKEFILE_LIST))
+
+# Initialize MySQL
+$(MYSQL_DATADIR)/mysql: clean
+	mysql_install_db \
+		--force \
+		--datadir=$(MYSQL_DATADIR) \
+		$(MYSQL_BASEDIR_FLAG)
+
+# Start MySQL server in the background
+$(MYSQL_SOCKET): $(MYSQL_DATADIR)/mysql
+	mysqld \
+		--log-error=error.log \
+		--pid-file=mysql.pid \
+		--default-time-zone=+00:00 \
+		--socket=$(notdir $(MYSQL_SOCKET)) \
+		--datadir=$(MYSQL_DATADIR) \
+		$(MYSQL_BASEDIR_FLAG) &
+	sleep 1
+
+# Install the lastfm database
+$(MYSQL_DATADIR)/lastfm: lastfm_schema.sql $(MYSQL_SOCKET)
+	mysql --socket=$(MYSQL_SOCKET) -u root < $<
+
+# Test related rules
 _test:
 	mkdir _test
 
-_test/30b9cdb95aecb5981749/testdata.tsv: _test
-	cd _test; git clone git@gist.github.com:30b9cdb95aecb5981749.git
+# Fetch test data from github
+GIST_ID := 30b9cdb95aecb5981749
+TEST_DATA_TSV := _test/$(GIST_ID)/testdata.tsv
+$(TEST_DATA_TSV): _test
+	cd _test; git clone https://gist.github.com/$(GIST_ID).git
 
-_test_data: _test/30b9cdb95aecb5981749/testdata.tsv
-
+# MySQL Unit Test Rules
+# Fetch MyTAP, a unit-test library for MySQL 
 MYTAP := _test/mytap/mytap.sql
 $(MYTAP): _test
-	cd _test; git clone git@github.com:matyasmarkovics/mytap.git
+	cd _test; git clone https://github.com/matyasmarkovics/mytap.git
 
-mytap: $(MYTAP)
-	cd $(dir $<); mysql --socket=../../$(MYSQL_SOCKET) -u root < $@.sql
+# Install MyTAP
+$(MYSQL_DATADIR)/tap: $(MYTAP)
+	cd $(dir $<); mysql --socket=../../$(MYSQL_SOCKET) -u root < mytap.sql
 
-test: create retest
+# Execute MyTAP Tests
+test: lastfm_tap.sql $(MYSQL_SOCKET) $(MYSQL_DATADIR)/lastfm $(MYSQL_DATADIR)/tap $(TEST_DATA_TSV)
+	mysql --socket=$(MYSQL_SOCKET) -u root < $<
 
-retest: _test_data mytap
-	mysql --socket=$(MYSQL_SOCKET) -u root < lastfm_schema.tap.sql
+
+# This Makefile contains rules related to MySQL tasks.
+#
+# run:
+# 	make $RULE
+# , where $RULE can be:
+#   clean - delete already created files
+#   init - initialize MySQL to a custom directory
+#   start - start MySQL server in the background
+#   stop - stop MySQL server
+#   console - connect to MySQL server with CLI
+#   test_data - fetch data for testing purposes
+#   test - test the lastfm database

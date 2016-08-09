@@ -2,7 +2,7 @@
 BEGIN;
 
 -- Plan the tests.
-SELECT tap.plan(3);
+SELECT tap.plan(4);
 
 LOAD DATA LOCAL INFILE '_test/30b9cdb95aecb5981749/testdata.tsv'
 INTO TABLE lastfm.log
