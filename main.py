@@ -8,6 +8,7 @@ import tempfile
 import os
 from multiprocessing import Pool
 import sys
+import random
 
 csv.field_size_limit(sys.maxsize)
 
@@ -38,7 +39,8 @@ def write_row(row):
                 );
             """
             data = (row[0], row[3], row[5], row[1])
-            print "INSERT(%s, %s, %s, %s)" % data
+            if random.randint(1, 20) == 10:
+                print "INSERT(%s, %s, %s, %s)" % data
             retry_count = 0
             while retry_count < 3:
                 try:

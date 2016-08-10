@@ -14,8 +14,8 @@ deps: _venv deps.txt
 	source $</bin/activate; pip install -r $@.txt;
 
 .PHONY: start
-start: DB_INSERT_POOL_WORKERS ?= 100
-start: DB_INSERT_POOL_CHUNK_SIZE ?= 100
+start: DB_INSERT_POOL_WORKERS ?= 50
+start: DB_INSERT_POOL_CHUNK_SIZE ?= 50
 start: _venv deps mysql-test
 	source $</bin/activate; \
 	DB_INSERT_POOL_WORKERS=$(DB_INSERT_POOL_WORKERS) \
@@ -25,7 +25,7 @@ start: _venv deps mysql-test
 
 .PHONY: stop
 stop: mysql-stop
-	pkill -f gunicorn || true
+	pkill -9 -f gunicorn || true
 
 .PHONY: test
 test: DATASET_PATH ?= _test/30b9cdb95aecb5981749/testdata.tsv

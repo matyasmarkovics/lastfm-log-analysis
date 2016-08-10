@@ -29,7 +29,7 @@ If there is a need to change the `DB_INSERT_POOL_WORKERS` or `DB_INSERT_POOL_CHU
 
 These environment variables control the how many connections there will be to MySQL at once, and
 how many rows of the uploaded dataset file will be handled (inserted into MySQL) by a single worker.
-The default value is 100 for both of these variables.
+The default value is 50 for both of these variables.
 
 Once we have the service running inside docker, we can start sending REST requests to it from the host OS as well.
 To test this, simply run (from the folder on the host machine, where the git repo was originally cloned to):
@@ -86,6 +86,9 @@ I ran out of time to fix this.
 So task no 4 is incomplete, as the response will probably be incorrect.
 
 Populating the database is slow, even with concurrent writers.
+
+Importing the big ~2M lines dataset resulted in memory issues when running inside docker.
+So, as a quick guess, I've halfed the default number of workers and chunk size.
 
 # Postmortem
 
