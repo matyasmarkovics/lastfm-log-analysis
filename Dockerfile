@@ -15,5 +15,6 @@ RUN adduser lastfm
 RUN su - lastfm -c 'git clone https://github.com/matyasmarkovics/lastfm-log-analysis.git'
 RUN su - lastfm -c 'make -C lastfm-log-analysis start test'
 # Make sure the service starts up with the docker image
+RUN echo "su - lastfm -c 'pushd lastfm-log-analysis; git pull; popd'" >> /root/.bash_profile
 RUN echo "su - lastfm -c 'make -C lastfm-log-analysis start'" >> /root/.bash_profile
 RUN echo "su - lastfm -c 'make -C lastfm-log-analysis stop'" >> /root/.bash_logout

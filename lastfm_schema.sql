@@ -70,7 +70,8 @@ CREATE TRIGGER log_to_played_song
             AND played_at BETWEEN
                 NEW.played_at - INTERVAL 20 MINUTE
                 AND
-                NEW.played_at + INTERVAL 20 MINUTE;
+                NEW.played_at + INTERVAL 20 MINUTE
+        GROUP BY session_id;
 
         IF existing_session_id IS NULL THEN
             INSERT INTO session
