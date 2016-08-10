@@ -15,7 +15,7 @@ deps: _venv deps.txt
 
 .PHONY: start
 start: _venv deps mysql-test
-	source $</bin/activate; gunicorn -b 0.0.0.0:8000 --timeout 300 --reload main:app &
+	source $</bin/activate; gunicorn -b 0.0.0.0:8000 --timeout 0 --reload main:app &
 	sleep 1
 
 .PHONY: stop
