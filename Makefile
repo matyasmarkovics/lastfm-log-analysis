@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 
-db-%:
-	make -C mysql $*
+mysql-%:
+	make -f Makefile.mysql $*
 
 docker-%:
 	make -f Makefile.docker $*
@@ -14,17 +14,17 @@ deps: _venv deps.txt
 	source $</bin/activate; pip install -r $@.txt;
 
 .PHONY: start
-start: _venv deps db-test
+start: _venv deps mysql-test
 	source $</bin/activate; gunicorn -b 0.0.0.0:8000 --reload main:app &
 	sleep 1
 
 .PHONY: stop
-stop: db-stop
+stop: mysql-stop
 	pkill -f gunicorn || true
 
 .PHONY: test
-test: db-test_data
-	curl -F "tsv=@mysql/_test/30b9cdb95aecb5981749/testdata.tsv" \
+test: mysql-test_data
+	curl -F "tsv=@_test/30b9cdb95aecb5981749/testdata.tsv" \
 			localhost:8000/log/memory; \
 	curl localhost:8000/users;
 	curl localhost:8000/play/top/10/users;
@@ -32,17 +32,17 @@ test: db-test_data
 	curl localhost:8000/play/top/10/sessions;
 
 .PHONY: help
-help:
+help: docker-help mysql-help
 	tail -n16 $(lastword $(MAKEFILE_LIST))
 
 # This is the main Makefile of the project.
 # It contains rules related to:
-# 	Docker - a lightweight OS virtualization platform,
-# 	the Python environment and dependencies,
+# 	the Python environment, its dependencies and
 # 	Gunicorn - a fast, RESTful HTTP server.
-# It also proxies MySQL related rules, as db-$RULE.
-# Example:
-# 	make db-start
+# It also proxies Docker and MySQL related rules, as docker-$RULE and mysql-$RULE.
+# Examples:
+# 	make mysql-start - Will start the MySQL server
+# 	make docker-start - Will start the Docker container
 #
 # run:
 # 	make $RULE

@@ -91,6 +91,6 @@ ENV/
 # Specific to this project
 *.swp
 _venv
-mysql/_test
-mysql/_data
+_test
+_data
 

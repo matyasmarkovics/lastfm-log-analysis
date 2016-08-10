@@ -1,11 +1,27 @@
+.DEFAULT_GOAL := help
+
 DOCKER := $(shell which docker)
 
 $(DOCKER):
 	echo "Please install docker: https://www.docker.com/products/docker"; exit
 
-.PHONY: build run
-build : $(DOCKER)
+.PHONY: init start help
+init : ./Dockerfile $(DOCKER)
 	docker build -t matyas/lastfm:1.1 .
 
-run: $(DOCKER)
+start: $(DOCKER)
 	docker run -t -i -p 8000:8000 matyas/lastfm:1.1 /bin/bash -login
+
+help:
+	tail -n11 $(lastword $(MAKEFILE_LIST))
+
+# This Makefile contain rules related to Docker, 
+# a lightweight OS virtualization platform.
+# run:
+# 	make $RULE
+# , where $RULE can be:
+# 	init - Create a docker image containing the lastfm service and its dependencies.
+# 			It will run integration tests as well prior completing the image build. 
+# 	start - Start the docker container, mysql server and the lastfm service in the background.
+# 			It logs into the container as root with a bash shell running.
+# 			The REST web service started and stopped by .bash_profile and .bash_logout respectively.
