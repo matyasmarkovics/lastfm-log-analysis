@@ -11,6 +11,10 @@ First of we need to create a virtual machine to run the service on.
 I've experienced hang when installing the EPEL rpm packege.
 In that case simply 'CTRL+C' and re-run the make command above.
 
+Before starting the virtual machine, please give docker as much memory and CPU as they can have.
+Docker Preferences: 
+![alt text](https://raw.githubusercontent.com/matyasmarkovics/lastfm-log-analysis/master/docker_prefs.png "Docker Preferences")
+
 To start the service: 
 > make docker-start
 
