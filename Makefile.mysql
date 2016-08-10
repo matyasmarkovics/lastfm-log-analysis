@@ -62,13 +62,13 @@ _test:
 GIST_ID := 30b9cdb95aecb5981749
 TEST_DATA_TSV := _test/$(GIST_ID)/testdata.tsv
 $(TEST_DATA_TSV): _test
-	cd _test; git clone https://gist.github.com/$(GIST_ID).git
+	cd _test; rm -rf $(GIST_ID); git clone https://gist.github.com/$(GIST_ID).git
 
 # MySQL Unit Test Rules
 # Fetch MyTAP, a unit-test library for MySQL 
 MYTAP := _test/mytap/mytap.sql
 $(MYTAP): _test
-	cd _test; git clone https://github.com/matyasmarkovics/mytap.git
+	cd _test; rm -rf mytap; git clone https://github.com/matyasmarkovics/mytap.git
 
 # Install MyTAP
 $(MYSQL_DATADIR)/tap: $(MYTAP)
