@@ -64,14 +64,15 @@ CREATE TRIGGER log_to_played_song
         SET artist = NEW.artist,
             track = NEW.track;
         
-        SELECT session_id INTO existing_session_id
+        SELECT MAX(session_id) INTO existing_session_id
         FROM play
         WHERE user_id = (SELECT user_id FROM user WHERE username = NEW.username)
             AND played_at BETWEEN
                 NEW.played_at - INTERVAL 20 MINUTE
                 AND
                 NEW.played_at + INTERVAL 20 MINUTE
-        GROUP BY session_id;
+        -- GROUP BY session_id
+        ;
 
         IF existing_session_id IS NULL THEN
             INSERT INTO session
@@ -101,6 +102,3 @@ CREATE TRIGGER log_to_played_song
     END$$
 
 DELIMITER ;
-
-
--- DEFAULT CHARSET=utf8 COLLATE=utf8_bin

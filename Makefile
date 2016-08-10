@@ -14,8 +14,13 @@ deps: _venv deps.txt
 	source $</bin/activate; pip install -r $@.txt;
 
 .PHONY: start
+start: DB_INSERT_POOL_WORKERS ?= 100
+start: DB_INSERT_POOL_CHUNK_SIZE ?= 100
 start: _venv deps mysql-test
-	source $</bin/activate; gunicorn -b 0.0.0.0:8000 --timeout 0 --reload main:app &
+	source $</bin/activate; \
+	DB_INSERT_POOL_WORKERS=$(DB_INSERT_POOL_WORKERS) \
+	DB_INSERT_POOL_CHUNK_SIZE=$(DB_INSERT_POOL_CHUNK_SIZE) \
+	gunicorn -b 0.0.0.0:8000 --timeout 0 --reload main:app &
 	sleep 1
 
 .PHONY: stop
@@ -25,14 +30,15 @@ stop: mysql-stop
 .PHONY: test
 test: DATASET_PATH ?= _test/30b9cdb95aecb5981749/testdata.tsv
 test: DATASET_IMPORT_MODE ?= memory
+test: TOP_N ?= 10
 test: mysql-test_data
 	curl -X DELETE localhost:8000/log; \
 	curl -F "tsv=@$(DATASET_PATH)" \
 			localhost:8000/log/$(DATASET_IMPORT_MODE); \
 	curl localhost:8000/users;
-	curl localhost:8000/play/top/10/users;
-	curl localhost:8000/play/top/10/songs;
-	curl localhost:8000/play/top/10/sessions;
+	curl localhost:8000/play/top/$(TOP_N)/users;
+	curl localhost:8000/play/top/$(TOP_N)/songs;
+	curl localhost:8000/play/top/$(TOP_N)/sessions;
 
 .PHONY: help
 help: docker-help mysql-help

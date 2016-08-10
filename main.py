@@ -1,10 +1,15 @@
 import falcon
 from falcon_multipart.middleware import MultipartMiddleware
 import pymysql.cursors
+from pymysql.err import InternalError
 from contextlib import contextmanager
 import csv
 import tempfile
 import os
+from multiprocessing import Pool
+import sys
+
+csv.field_size_limit(sys.maxsize)
 
 @contextmanager
 def mysql_connector():
@@ -21,6 +26,29 @@ def mysql_connector():
         yield connection
     finally:
         connection.close()
+
+def write_row(row):
+    with mysql_connector() as connection:
+        with connection.cursor() as cursor:
+            sql = """
+                INSERT IGNORE INTO log (username, artist, track, played_at)
+                VALUES (
+                    %s, %s, %s,
+                    REPLACE(REPLACE(%s, 'T', ' '), 'Z', '')
+                );
+            """
+            data = (row[0], row[3], row[5], row[1])
+            print "INSERT(%s, %s, %s, %s)" % data
+            retry_count = 0
+            while retry_count < 3:
+                try:
+                    return cursor.execute(sql, data)
+                except InternalError as ie:
+                    retry_count += 1
+                    if retry_count > 3:
+                        raise ie
+
+
 
 
 app = falcon.API(middleware=[MultipartMiddleware()])
@@ -67,26 +95,21 @@ class LogFileResource(DbTableResource):
 class LogMemoryResource(DbTableResource):
     on_get_query = 'SELECT * FROM log;'
 
+    def __init__(self):
+        workers = int(os.environ['DB_INSERT_POOL_WORKERS'])
+        chunk_size = int(os.environ['DB_INSERT_POOL_CHUNK_SIZE'])
+        self.pool = Pool(workers)
+        self.chunk_size = chunk_size
+        print "workers: %s, chunk_size: %s" % (workers, chunk_size)
+
     def on_post(self, req, resp):
         tsv = req.get_param('tsv')
         if tsv.file:
-            with mysql_connector() as connection:
-                with connection.cursor() as cursor:
-                    linecount = 0
-                    tsv_reader = csv.reader(tsv.file, delimiter='\t')
-                    for row in tsv_reader:
-                        sql = """
-                            INSERT IGNORE INTO log (username, artist, track, played_at)
-                            VALUES (
-                                %s, %s, %s,
-                                REPLACE(REPLACE(%s, 'T', ' '), 'Z', '')
-                            );
-                        """
-                        data = (row[0], row[3], row[5], row[1])
-                        cursor.execute(sql, data)
-                        linecount += 1
-                    resp.status = falcon.HTTP_200
-                    resp.body = "%s\n" % linecount
+            tsv_reader = csv.reader(tsv.file, delimiter='\t')
+            inserted = self.pool.map(write_row, tsv_reader, self.chunk_size)
+            resp.body = "%s\n" % sum(inserted)
+            resp.status = falcon.HTTP_200
+
 
 
 class LogResource(LogMemoryResource):
