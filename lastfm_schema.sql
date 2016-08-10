@@ -41,6 +41,7 @@ CREATE TABLE play (
     session_id INT(11) UNSIGNED NOT NULL,
 
     INDEX (user_id),
+    INDEX (played_at),
     INDEX (song_id),
     INDEX (session_id),
     FOREIGN KEY (user_id) REFERENCES user(user_id),
@@ -65,8 +66,7 @@ CREATE TRIGGER log_to_played_song
         
         SELECT session_id INTO existing_session_id
         FROM play
-        JOIN user USING (user_id)
-        WHERE username = NEW.username
+        WHERE user_id = (SELECT user_id FROM user WHERE username = NEW.username)
             AND played_at BETWEEN
                 NEW.played_at - INTERVAL 20 MINUTE
                 AND
