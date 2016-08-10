@@ -3,6 +3,9 @@
 db-%:
 	make -C mysql $*
 
+docker-%:
+	make -f Makefile.docker $*
+
 _venv:
 	virtualenv $@
 
@@ -12,7 +15,7 @@ deps: _venv deps.txt
 
 .PHONY: start
 start: _venv deps db-test
-	source $</bin/activate; gunicorn --reload main:app &
+	source $</bin/activate; gunicorn -b 0.0.0.0:8000 --reload main:app &
 	sleep 1
 
 .PHONY: stop

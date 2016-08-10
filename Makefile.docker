@@ -1,0 +1,11 @@
+DOCKER := $(shell which docker)
+
+$(DOCKER):
+	echo "Please install docker: https://www.docker.com/products/docker"; exit
+
+.PHONY: build run
+build : $(DOCKER)
+	docker build -t matyas/lastfm:1.1 .
+
+run: $(DOCKER)
+	docker run -t -i -p 8000:8000 matyas/lastfm:1.1 /bin/bash -login
