@@ -8,12 +8,13 @@ There are 3 different Makefile the following will display help messages for all 
 
 First of we need to create a virtual machine to run the service on.
 > make docker-init
+
 I've experienced hang when installing the EPEL rpm packege.
 In that case simply 'CTRL+C' and re-run the make command above.
 
 Before starting the virtual machine, please give docker as much memory and CPU as they can have.
-Docker Preferences: 
-![alt text](https://raw.githubusercontent.com/matyasmarkovics/lastfm-log-analysis/master/docker_prefs.png "Docker Preferences")
+Docker Preferences:
+<img src="https://raw.githubusercontent.com/matyasmarkovics/lastfm-log-analysis/master/docker_prefs.png" alt="Docker Preferences" width="100" />
 
 To start the service: 
 > make docker-start
@@ -25,6 +26,7 @@ while the REST service is running as the `lastfm` user.
 
 If there is a need to change the `DB_INSERT_POOL_WORKERS` or `DB_INSERT_POOL_CHUNK_SIZE` for the service, run:
 > su - lastfm -c 'DB_INSERT_POOL_WORKERS=10 DB_INSERT_POOL_CHUNK_SIZE=5 make -C lastfm-log-analysis stop start test'
+
 These environment variables control the how many connections there will be to MySQL at once, and
 how many rows of the uploaded dataset file will be handled (inserted into MySQL) by a single worker.
 The default value is 100 for both of these variables.
