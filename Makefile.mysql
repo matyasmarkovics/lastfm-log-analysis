@@ -24,7 +24,7 @@ start: $(MYSQL_SOCKET)
 stop:
 	pkill mysqld || true 
 
-console: $(MYSQL_SOCKET)
+console: #$(MYSQL_SOCKET)
 	mysql --socket=$(MYSQL_SOCKET) -u root
 
 test_data: $(TEST_DATA_TSV)

@@ -89,6 +89,23 @@ class LogMemoryResource(DbTableResource):
                     resp.body = "%s\n" % linecount
 
 
+class LogResource(LogMemoryResource):
+    def on_delete(self, req, resp):
+        with mysql_connector() as connection:
+            with connection.cursor() as cursor:
+                sql = """
+                SET FOREIGN_KEY_CHECKS = 0;
+                TRUNCATE log;
+                TRUNCATE user;
+                TRUNCATE song;
+                TRUNCATE session;
+                TRUNCATE play;
+                SET FOREIGN_KEY_CHECKS = 1;
+                """
+                cursor.execute(sql)
+                resp.status = falcon.HTTP_200
+
+
 class UsersResource(DbTableResource):
     on_get_query = 'SELECT username FROM user;'
 
@@ -129,6 +146,7 @@ class TopSessionsResource(DbTableResource):
     LIMIT {limit};
     """
 
+app.add_route('/log', LogResource())
 app.add_route('/log/file', LogFileResource())
 app.add_route('/log/memory', LogMemoryResource())
 app.add_route('/users', UsersResource())

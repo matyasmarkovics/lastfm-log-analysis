@@ -23,9 +23,12 @@ stop: mysql-stop
 	pkill -f gunicorn || true
 
 .PHONY: test
+test: DATASET_PATH ?= _test/30b9cdb95aecb5981749/testdata.tsv
+test: DATASET_IMPORT_MODE ?= memory
 test: mysql-test_data
-	curl -F "tsv=@_test/30b9cdb95aecb5981749/testdata.tsv" \
-			localhost:8000/log/memory; \
+	curl -X DELETE localhost:8000/log; \
+	curl -F "tsv=@$(DATASET_PATH)" \
+			localhost:8000/log/$(DATASET_IMPORT_MODE); \
 	curl localhost:8000/users;
 	curl localhost:8000/play/top/10/users;
 	curl localhost:8000/play/top/10/songs;
