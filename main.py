@@ -3,14 +3,14 @@ from falcon_multipart.middleware import MultipartMiddleware
 import pymysql.cursors
 from pymysql.err import InternalError
 from contextlib import contextmanager
-import csv
 import tempfile
 import os
 from multiprocessing import Pool
 import sys
 import random
+import cgi
+import re
 
-csv.field_size_limit(sys.maxsize)
 
 @contextmanager
 def mysql_connector():
@@ -28,32 +28,101 @@ def mysql_connector():
     finally:
         connection.close()
 
-def write_row(row):
+def gen_cursor():
     with mysql_connector() as connection:
         with connection.cursor() as cursor:
-            sql = """
-                INSERT IGNORE INTO log (username, artist, track, played_at)
-                VALUES (
-                    %s, %s, %s,
-                    REPLACE(REPLACE(%s, 'T', ' '), 'Z', '')
-                );
-            """
-            data = (row[0], row[3], row[5], row[1])
-            if random.randint(1, 20) == 10:
-                print "INSERT(%s, %s, %s, %s)" % data
-            retry_count = 0
-            while retry_count < 3:
-                try:
-                    return cursor.execute(sql, data)
-                except InternalError as ie:
-                    retry_count += 1
-                    if retry_count > 3:
-                        raise ie
+            yield cursor
+
+g_gen_cursor = None
+def init_worker():
+    global g_cursor, g_gen_cursor
+    if not g_gen_cursor:
+        g_gen_cursor = gen_cursor()
+    g_cursor = next(g_gen_cursor)
 
 
+def parse(line):
+    row = re.split('\t', line.strip())
+    data = (row[0], row[3], row[5], row[1])
+    if random.randint(1, 5000) == 10:
+        print "insert(%s, %s, %s, %s)" % data
+    return data
+
+def insert(args):
+    stmt = """
+        INSERT INTO log (username, artist, track, played_at)
+        VALUES {}
+        ON DUPLICATE KEY UPDATE duplicate = duplicate + 1;
+    """
+    values = ["(%s, %s, %s, REPLACE(REPLACE(%s, 'T', ' '), 'Z', ''))"]
+    data = []
+    for line in args:
+        try:
+            data.extend(parse(line))
+        except IndexError:
+            print "cannot parse line: %s" % line
+
+    sql = stmt.format(',\n'.join(values * (len(data)/4)))
+
+    retry_count = 0
+    while retry_count < 3:
+        try:
+            inserted = g_cursor.execute(sql, data)
+            return inserted
+        except InternalError as ie:
+            retry_count += 1
+            if retry_count > 3:
+                raise ie
 
 
-app = falcon.API(middleware=[MultipartMiddleware()])
+global pool
+pool = Pool(int(os.environ['DB_INSERT_POOL_WORKERS']), init_worker)
+
+class FileList(list):
+
+    def read(self):
+        return self
+
+    def seek(self, position):
+        pass
+
+    def write(self, item):
+        self.append(item)
+
+
+class Parser(cgi.FieldStorage):
+    chunk_size = int(os.environ['DB_INSERT_POOL_CHUNK_SIZE'])
+    workers = int(os.environ['DB_INSERT_POOL_WORKERS'])
+    task_buffer_size = workers * chunk_size
+
+    def _FieldStorage__write(self, line):
+        if not isinstance(self.file, FileList):
+            self.file = FileList()
+        if not isinstance(self._FieldStorage__file, list):
+            self._FieldStorage__file = []
+
+        self._FieldStorage__file.append(line)
+        if len(self._FieldStorage__file) >= self.task_buffer_size:
+            self.force_write()
+
+    def force_write(self):
+        if len(self._FieldStorage__file):
+            tasks = [self._FieldStorage__file] \
+                if self.workers >= len(self._FieldStorage__file) \
+                else [ self._FieldStorage__file[i::self.workers]
+                        for i in range(self.workers)
+                        if len(self._FieldStorage__file[i::self.workers]) > 0 ]
+            self.file.append(pool.map_async(insert, tasks, 1))
+            self._FieldStorage__file = []
+
+    def get_all(self, wrapper=None):
+        if not wrapper:
+            wrapper = lambda x: x
+        self.force_write()
+        return wrapper([wrapper([mr or 0 for mr in ar.get()]) for ar in self.file])
+
+
+app = falcon.API(middleware=[MultipartMiddleware(parser=Parser)])
 
 
 class DbTableResource(object):
@@ -79,11 +148,10 @@ class LogFileResource(DbTableResource):
         tsv = req.get_param('tsv')
         if tsv.file:
             with tempfile.NamedTemporaryFile() as tmpf:
+                tmpf.write(tsv.file.read())
+                tmpf.flush()
                 with mysql_connector() as connection:
                     with connection.cursor() as cursor:
-                        tmpf.write(tsv.file.read())
-                        tmpf.flush()
-
                         sql = """
                         LOAD DATA LOCAL INFILE %s
                         INTO TABLE log
@@ -97,20 +165,11 @@ class LogFileResource(DbTableResource):
 class LogMemoryResource(DbTableResource):
     on_get_query = 'SELECT * FROM log;'
 
-    def __init__(self):
-        workers = int(os.environ['DB_INSERT_POOL_WORKERS'])
-        chunk_size = int(os.environ['DB_INSERT_POOL_CHUNK_SIZE'])
-        self.pool = Pool(workers)
-        self.chunk_size = chunk_size
-        print "workers: %s, chunk_size: %s" % (workers, chunk_size)
-
     def on_post(self, req, resp):
         tsv = req.get_param('tsv')
-        if tsv.file:
-            tsv_reader = csv.reader(tsv.file, delimiter='\t')
-            inserted = self.pool.map(write_row, tsv_reader, self.chunk_size)
-            resp.body = "%s\n" % sum(inserted)
-            resp.status = falcon.HTTP_200
+        total_rows = tsv.get_all(wrapper=sum)
+        resp.body = "%s\n" % total_rows
+        resp.status = falcon.HTTP_200
 
 
 
