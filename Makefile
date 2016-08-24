@@ -33,7 +33,7 @@ test: DATASET_IMPORT_MODE ?= memory
 test: TOP_N ?= 10
 test: mysql-test_data
 	curl -X DELETE localhost:8000/log; \
-	curl -F "tsv=@$(DATASET_PATH)" \
+	curl -v -F "tsv=@$(DATASET_PATH)" \
 			localhost:8000/log/$(DATASET_IMPORT_MODE); \
 	curl localhost:8000/users;
 	curl localhost:8000/play/top/$(TOP_N)/users;
