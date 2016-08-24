@@ -9,8 +9,9 @@ CREATE TABLE log (
     played_at TIMESTAMP NOT NULL,
     artist VARCHAR(255) NOT NULL,
     track VARCHAR(255) NOT NULL,
+    duplicate INT(11) UNSIGNED NOT NULL DEFAULT 0,
 
-    CONSTRAINT uc_user_played UNIQUE (username, played_at)
+    CONSTRAINT uc_user_played_artist_track UNIQUE (username, played_at, artist, track)
 ) ENGINE=InnoDB AUTO_INCREMENT = 1;
     
 CREATE TABLE user (
