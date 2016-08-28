@@ -4,102 +4,56 @@ CREATE SCHEMA lastfm
 USE lastfm;
 
 CREATE TABLE log (
-    log_id INT(11) UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    log_id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(255) NOT NULL,
-    played_at TIMESTAMP NOT NULL,
+    played_at TIMESTAMP NOT NULL DEFAULT 0,
     artist VARCHAR(255) NOT NULL,
     track VARCHAR(255) NOT NULL,
-    duplicate INT(11) UNSIGNED NOT NULL DEFAULT 0,
+    duplicate TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    session_uuid BIGINT UNSIGNED,
+    INDEX (username),
+    INDEX (artist, track),
+    INDEX (played_at),
+    INDEX (session_uuid),
 
     CONSTRAINT uc_user_played_artist_track UNIQUE (username, played_at, artist, track)
 ) ENGINE=InnoDB AUTO_INCREMENT = 1;
+
+
+DELIMITER &&
+
+CREATE PROCEDURE create_user_sessions (IN username_in VARCHAR(255))
+BEGIN
+    DECLARE latest_session_uuid BIGINT UNSIGNED DEFAULT UUID_SHORT();
+    DECLARE latest_played_at TIMESTAMP DEFAULT '1970-01-01 00:00:00';
     
-CREATE TABLE user (
-    user_id INT(11) UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    username VARCHAR(255) NOT NULL UNIQUE KEY
-) ENGINE=InnoDB AUTO_INCREMENT = 1;
+    DECLARE current_log_id INT UNSIGNED;
+    DECLARE current_played_at TIMESTAMP;
 
-CREATE TABLE song (
-    song_id INT(11) UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    artist VARCHAR(255) NOT NULL,
-    track VARCHAR(255) NOT NULL,
+    DECLARE done INT DEFAULT FALSE;
+    DECLARE cur CURSOR FOR SELECT log_id, played_at FROM log
+                            WHERE username = username_in
+                            ORDER BY played_at ASC;
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
 
-    CONSTRAINT uc_artist_track UNIQUE KEY (artist, track) 
-) ENGINE=InnoDB AUTO_INCREMENT = 1;
-
-CREATE TABLE session (
-    session_id INT(11) UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    duration_s INT(11) UNSIGNED NOT NULL DEFAULT 0,
-    started_at TIMESTAMP NOT NULL,
-    ended_at TIMESTAMP NOT NULL
-) ENGINE=InnoDB AUTO_INCREMENT = 1;
-
-CREATE TABLE play (
-    play_id INT(11) UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    user_id INT(11) UNSIGNED NOT NULL,
-    played_at TIMESTAMP NOT NULL,
-    song_id INT(11) UNSIGNED NOT NULL,
-    session_id INT(11) UNSIGNED NOT NULL,
-
-    INDEX (user_id),
-    INDEX (played_at),
-    INDEX (song_id),
-    INDEX (session_id),
-    FOREIGN KEY (user_id) REFERENCES user(user_id),
-    FOREIGN KEY (song_id) REFERENCES song(song_id),
-    FOREIGN KEY (session_id) REFERENCES session(session_id)
-) ENGINE=InnoDB AUTO_INCREMENT = 1;
-
-
-DELIMITER $$
-
-CREATE TRIGGER log_to_played_song
-    AFTER INSERT ON log FOR EACH ROW
-    BEGIN
-        DECLARE existing_session_id INT(11) UNSIGNED;
-        
-        INSERT IGNORE INTO user
-        SET username = NEW.username;
-        
-        INSERT IGNORE INTO song
-        SET artist = NEW.artist,
-            track = NEW.track;
-        
-        SELECT MAX(session_id) INTO existing_session_id
-        FROM play
-        WHERE user_id = (SELECT user_id FROM user WHERE username = NEW.username)
-            AND played_at BETWEEN
-                NEW.played_at - INTERVAL 20 MINUTE
-                AND
-                NEW.played_at + INTERVAL 20 MINUTE
-        -- GROUP BY session_id
-        ;
-
-        IF existing_session_id IS NULL THEN
-            INSERT INTO session
-            SET started_at = NEW.played_at,
-                ended_at = NEW.played_at;
-            SELECT LAST_INSERT_ID() INTO existing_session_id;
-        ELSE
-            UPDATE session
-            SET session.started_at = LEAST(NEW.played_at, session.started_at),
-                session.ended_at = GREATEST(NEW.played_at, session.ended_at),
-                session.duration_s = TIMESTAMPDIFF(
-                    SECOND,
-                    LEAST(NEW.played_at, session.started_at),
-                    GREATEST(NEW.played_at, session.ended_at)) 
-            WHERE session.session_id = existing_session_id;
+    OPEN cur;
+    read_loop: LOOP
+        FETCH cur INTO current_log_id, current_played_at;
+        IF done THEN
+            LEAVE read_loop;
         END IF;
 
-        INSERT INTO play
-        SET user_id = (SELECT user_id FROM user
-                        WHERE username = NEW.username),
-            played_at = NEW.played_at,
-            song_id = (SELECT song_id FROM song
-                        WHERE artist = NEW.artist
-                            AND track = NEW.track),
-            session_id = existing_session_id;
-                            
-    END$$
+        IF current_played_at > latest_played_at + INTERVAL 20 MINUTE THEN
+            SELECT UUID_SHORT() INTO latest_session_uuid;
+        END IF;
+
+        UPDATE log SET session_uuid = latest_session_uuid
+        WHERE log_id = current_log_id;
+
+        SELECT current_played_at INTO latest_played_at;
+    END LOOP;
+    CLOSE cur;
+
+END&&
 
 DELIMITER ;

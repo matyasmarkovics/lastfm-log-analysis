@@ -14,8 +14,8 @@ deps: _venv deps.txt
 	source $</bin/activate; pip install -r $@.txt;
 
 .PHONY: start
-start: DB_INSERT_POOL_WORKERS ?= 50
-start: DB_INSERT_POOL_CHUNK_SIZE ?= 50
+start: DB_INSERT_POOL_WORKERS ?= 140
+start: DB_INSERT_POOL_CHUNK_SIZE ?= 1000
 start: _venv deps mysql-test
 	source $</bin/activate; \
 	DB_INSERT_POOL_WORKERS=$(DB_INSERT_POOL_WORKERS) \
@@ -32,13 +32,13 @@ test: DATASET_PATH ?= _test/30b9cdb95aecb5981749/testdata.tsv
 test: DATASET_IMPORT_MODE ?= memory
 test: TOP_N ?= 10
 test: mysql-test_data
-	curl -X DELETE localhost:8000/log; \
-	curl -v -F "tsv=@$(DATASET_PATH)" \
-			localhost:8000/log/$(DATASET_IMPORT_MODE); \
-	curl localhost:8000/users;
-	curl localhost:8000/play/top/$(TOP_N)/users;
-	curl localhost:8000/play/top/$(TOP_N)/songs;
-	curl localhost:8000/play/top/$(TOP_N)/sessions;
+	time curl -X DELETE localhost:8000/log; \
+	time curl -v -F "tsv=@$(DATASET_PATH)" \
+				localhost:8000/log/$(DATASET_IMPORT_MODE); \
+	time curl localhost:8000/users;
+	time curl localhost:8000/play/top/$(TOP_N)/users;
+	time curl localhost:8000/play/top/$(TOP_N)/songs;
+	time curl localhost:8000/play/top/$(TOP_N)/sessions;
 
 .PHONY: help
 help: docker-help mysql-help

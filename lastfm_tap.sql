@@ -10,18 +10,21 @@ FIELDS TERMINATED BY '\t'
 (username, played_at, @dummy, artist, @dummy, track);
 
 -- Run the tests.
-SELECT tap.eq( COUNT(*), 2, 'users saved' )
-FROM lastfm.user;
+SELECT tap.eq( COUNT(DISTINCT username), 2, 'users saved' )
+FROM lastfm.log;
 
-SELECT tap.eq( COUNT(*), 8, 'songs saved' )
-FROM lastfm.song;
+SELECT tap.eq( COUNT(DISTINCT artist, track), 8, 'songs saved' )
+FROM lastfm.log;
 
-SELECT tap.eq( COUNT(*), 6, 'sessions identified' )
-FROM lastfm.session;
 
-SELECT tap.eq( COUNT(*), 10, 'All `log` entries saved to `play`' )
-FROM lastfm.play;
+CALL lastfm.create_user_sessions('Ted');
+CALL lastfm.create_user_sessions('Uri');
+SELECT tap.eq( COUNT(DISTINCT session_uuid), 6, 'sessions identified' )
+FROM lastfm.log;
+
+SELECT tap.eq( COUNT(*), 10, 'All `log` entries saved' )
+FROM lastfm.log;
 
 -- Finish the tests and clean up.
 CALL tap.finish();
-ROLLBACK;
+-- ROLLBACK;

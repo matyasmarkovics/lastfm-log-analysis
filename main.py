@@ -74,6 +74,8 @@ def insert(args):
             if retry_count > 3:
                 raise ie
 
+def create_user_sessions(user):
+    return g_cursor.callproc('create_user_sessions', user)
 
 global pool
 pool = Pool(int(os.environ['DB_INSERT_POOL_WORKERS']), init_worker)
@@ -178,28 +180,21 @@ class LogResource(LogMemoryResource):
         with mysql_connector() as connection:
             with connection.cursor() as cursor:
                 sql = """
-                SET FOREIGN_KEY_CHECKS = 0;
                 TRUNCATE log;
-                TRUNCATE user;
-                TRUNCATE song;
-                TRUNCATE session;
-                TRUNCATE play;
-                SET FOREIGN_KEY_CHECKS = 1;
                 """
                 cursor.execute(sql)
                 resp.status = falcon.HTTP_200
 
 
 class UsersResource(DbTableResource):
-    on_get_query = 'SELECT username FROM user;'
+    on_get_query = 'SELECT DISTINCT username FROM log;'
 
 
 class TopUsersResource(DbTableResource):
     on_get_query = """
-    SELECT username, COUNT(song_id)
-    FROM play
-    JOIN user USING (user_id)
-    GROUP BY user_id
+    SELECT username, COUNT(DISTINCT artist, track)
+    FROM log
+    GROUP BY username
     ORDER BY 2 DESC
     LIMIT {limit};
     """
@@ -207,28 +202,39 @@ class TopUsersResource(DbTableResource):
 class TopSongsResource(DbTableResource):
     on_get_query = """
     SELECT CONCAT(artist, ' - ', track), COUNT(played_at)
-    FROM play
-    JOIN song USING (song_id)
-    GROUP BY song_id
+    FROM log
+    GROUP BY artist, track
     ORDER BY 2 DESC
     LIMIT {limit};
     """
 
+
 class TopSessionsResource(DbTableResource):
     on_get_query = """
     SELECT
-        duration_s,
         username,
-        COUNT(played_at),
-        GROUP_CONCAT(CONCAT(artist, ' - ', track))
-    FROM play
-    JOIN user USING (user_id)
-    JOIN song USING (song_id)
-    JOIN session USING (session_id)
-    GROUP BY session_id
-    ORDER BY 1 DESC
+        TIMESTAMPDIFF(SECOND, MIN(played_at), MAX(played_at)) AS duration_s,
+        COUNT(played_at) AS size,
+        GROUP_CONCAT(CONCAT(artist, ' - ', track)) AS songs
+    FROM log
+    GROUP BY session_uuid
+    ORDER BY 2 DESC
     LIMIT {limit};
     """
+
+    def on_get(self, req, resp, n=None):
+        with mysql_connector() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(UsersResource.on_get_query)
+                for _ in pool.imap_unordered(create_user_sessions, cursor):
+                    pass
+                cursor.execute(self.on_get_query.format(limit=n))
+                fmt = lambda l: '\t'.join(['%s'] * len(l)) % l
+                resp.body = fmt(tuple([d[0] for d in cursor.description]))
+                resp.body += '\n'
+                resp.body += '\n'.join([fmt(r) for r in cursor])
+                resp.body += '\n'
+                resp.status = falcon.HTTP_200
 
 app.add_route('/log', LogResource())
 app.add_route('/log/file', LogFileResource())

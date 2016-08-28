@@ -45,6 +45,9 @@ $(MYSQL_SOCKET): $(MYSQL_DATADIR)/mysql
 		--log-error=error.log \
 		--pid-file=mysql.pid \
 		--default-time-zone=+00:00 \
+		--innodb_buffer_pool_size=$(shell expr 1024 \* 1024 \* 1024 ) \
+		--innodb_buffer_pool_instances=1 \
+		--innodb_autoinc_lock_mode=2 \
 		--socket=$(notdir $(MYSQL_SOCKET)) \
 		--datadir=$(MYSQL_DATADIR) \
 		$(MYSQL_BASEDIR_FLAG) &
